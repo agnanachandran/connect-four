@@ -9,7 +9,24 @@ const rl = readline.createInterface({
 enum Piece { Red = '🔴', Yellow = '🟡' };
 type Cell = Piece | null;
 type Turn = 'P1' | 'P2';
-type Result = 'P1_Win' | 'P2_Win' | 'Draw' | null;
+type Result = 'P1 Wins!' | 'P2 Wins!' | 'Draw' | null;
+type Board = Array<Array<Cell>>;
+
+// Returns row at which piece can be played or null if the piece cannot be played at the column
+const getLowestEmptyRowForColumn = (board: Board, col: number): number | null => {
+  for (let row = 0; row < Game.NUM_ROWS; row++) {
+    const isBottomRow = row === Game.NUM_ROWS - 1;
+
+    if (isBottomRow || board[row + 1][col]) {
+      if (board[row][col] === null) {
+        return row;
+      }
+    }
+  }
+
+  return null;
+}
+
 
 class Player {
   constructor(readonly piece: Piece, private readonly isHuman: boolean = true) { }
@@ -22,18 +39,41 @@ class Player {
     );
   }
 
+  getRandomColumn() {
+    return Math.floor(Math.random() * Game.NUM_COLS);
+  }
+
+  getColumnForRandomAIMove(game: Game) {
+    while (true) {
+      const randomCol = this.getRandomColumn();
+      let emptyRow = getLowestEmptyRowForColumn(game.board, randomCol);
+      if (emptyRow) {
+        return randomCol;
+      }
+    }
+  }
+
+  minimax(board: Board, depth: number): number {
+    return 1;
+  }
+
+  getColumnForSmartAIMove(game: Game): number {
+    return this.minimax(game.board, 4);
+  }
+
   async getColumnForMove(game: Game) {
     if (this.isHuman) {
       const col = await this.prompt();
       return parseInt(col) - 1;
     } else {
-      return Math.floor(Math.random() * Game.NUM_COLS);
+      return this.getColumnForSmartAIMove(game);
+      // return this.getColumnForRandomAIMove(game);
     }
   }
 
   async move(game: Game) {
     const col = await this.getColumnForMove(game);
-    game.placePiece(col, this.piece);
+    game.placePiece(game.board, col, this.piece);
   }
 }
 
@@ -42,26 +82,20 @@ class Game {
   static readonly NUM_COLS = 7;
   turn: Turn = 'P1';
 
-  readonly board: Array<Array<Cell>> = _.times(Game.NUM_ROWS, () => {
+  board: Board = _.times(Game.NUM_ROWS, () => {
     return _.times(Game.NUM_COLS, () => {
       return null;
     })
   });
 
   constructor(readonly player1: Player, readonly player2: Player) {
-
   }
 
-  placePiece(col: number, piece: Piece) {
-    for (let row = 0; row < Game.NUM_ROWS; row++) {
-      const isBottomRow = row === Game.NUM_ROWS - 1;
+  placePiece(board: Board, col: number, piece: Piece) {
+    const row = getLowestEmptyRowForColumn(this.board, col)
 
-      if (isBottomRow || this.board[row + 1][col]) {
-        if (this.board[row][col] === null) {
-          this.board[row][col] = piece;
-          break;
-        }
-      }
+    if (row !== null) {
+      board[row][col] = piece;
     }
   }
 
@@ -173,9 +207,9 @@ class Game {
           const player1Won = this.hasPlayerWonAtCell(this.player1, row, col);
           const player2Won = this.hasPlayerWonAtCell(this.player2, row, col);
           if (player1Won) {
-            return 'P1_Win';
+            return 'P1 Wins!';
           } else if (player2Won) {
-            return 'P2_Win';
+            return 'P2 Wins!';
           }
         }
       }
@@ -208,7 +242,7 @@ class Game {
 
 const main = async () => {
   const player1 = new Player(Piece.Red);
-  const player2 = new Player(Piece.Yellow);
+  const player2 = new Player(Piece.Yellow, false);
   const game = new Game(player1, player2);
   game.print();
   await game.play();
