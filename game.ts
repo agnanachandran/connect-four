@@ -141,8 +141,12 @@ class Game {
       score += 2;
     }
 
-    if (numMinimizingPieces === 3 && numEmpty === 1) {
-      score -= 500;
+    if (numMinimizingPieces === 4) {
+      score -= 1000000;
+    } else if (numMinimizingPieces === 3 && numEmpty === 1) {
+      score -= 5;
+    } else if (numMinimizingPieces === 2 && numEmpty === 2) {
+      score -= 2;
     }
 
     return score;
