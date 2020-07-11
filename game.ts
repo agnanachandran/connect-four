@@ -12,12 +12,13 @@ type Turn = 'P1' | 'P2';
 type Result = 'P1 Wins!' | 'P2 Wins!' | 'Draw' | null;
 type Board = Array<Array<Cell>>;
 type PlayerPieceMap = Record<'maximizingPlayer' | 'minimizingPlayer', Piece>;
+type Strategy = 'random' | 'minimax' | 'minimax_alpha_beta';
 
 class Player {
   otherPlayer: Player | null = null;
   static MAX_DEPTH: number = 5;
 
-  constructor(readonly piece: Piece, private readonly isHuman: boolean = true) { }
+  constructor(readonly piece: Piece, private readonly isHuman: boolean = true, private readonly strategy: Strategy = 'minimax_alpha_beta') { }
 
   setOtherPlayer(player: Player) {
     this.otherPlayer = player;
@@ -77,9 +78,11 @@ class Player {
     if (this.isHuman) {
       const col = await this.prompt();
       return parseInt(col) - 1;
+    } else if (this.strategy === 'random') {
+      return this.getColumnForRandomAIMove(game);
+    } else if (this.strategy === 'minimax') {
+      return this.getColumnForSmartAIMove(game, false);
     } else {
-      // return this.getColumnForRandomAIMove(game);
-      // return this.getColumnForSmartAIMove(game, false);
       return this.getColumnForSmartAIMove(game, true);
     }
   }
@@ -192,15 +195,14 @@ class Game {
   }
 
   minimax = (board: Board, depth: number, isMaximizingPlayer: boolean, playerPieceMap: PlayerPieceMap): number => {
-    const piece = isMaximizingPlayer ? playerPieceMap.maximizingPlayer : playerPieceMap.minimizingPlayer;
-    const opponentPiece = isMaximizingPlayer ? playerPieceMap.minimizingPlayer : playerPieceMap.maximizingPlayer;
     const result = this.getResult(board)
 
     if (depth === 0 || result !== null) {
       return this.evaluateBoard(board, playerPieceMap.maximizingPlayer, playerPieceMap.minimizingPlayer);
     }
 
-    const childBoards = this.getChildBoardsForBoard(board, piece);
+    const nextPieceToMove = isMaximizingPlayer ? playerPieceMap.minimizingPlayer : playerPieceMap.maximizingPlayer;
+    const childBoards = this.getChildBoardsForBoard(board, nextPieceToMove);
 
     if (isMaximizingPlayer) {
       let value = Number.MIN_SAFE_INTEGER;
@@ -412,7 +414,7 @@ class Game {
 
 const main = async () => {
   const player1 = new Player(Piece.Red);
-  const player2 = new Player(Piece.Yellow, false);
+  const player2 = new Player(Piece.Yellow, false, 'minimax_alpha_beta');
   player1.setOtherPlayer(player2);
   player2.setOtherPlayer(player1);
   const game = new Game(player1, player2);
