@@ -15,7 +15,7 @@ type PlayerPieceMap = Record<'maximizingPlayer' | 'minimizingPlayer', Piece>;
 
 class Player {
   otherPlayer: Player | null = null;
-  static MAX_DEPTH: number = 2;
+  static MAX_DEPTH: number = 5;
 
   constructor(readonly piece: Piece, private readonly isHuman: boolean = true) { }
 
@@ -45,14 +45,24 @@ class Player {
     }
   }
 
-  getColumnForSmartAIMove(game: Game): number {
+  getColumnForSmartAIMove(game: Game, shouldUseAlphaBetaPruning: boolean): number {
     const childBoards = game.getChildBoardsForBoard(game.board, this.piece);
 
     let bestCol = -1;
     let highestValue = Number.MIN_SAFE_INTEGER;
 
     childBoards.forEach((childBoard) => {
-      const minimaxValue = game.minimax(childBoard.board, Player.MAX_DEPTH, true, {maximizingPlayer: this.piece, minimizingPlayer: this.otherPlayer!.piece});
+      const minimaxValue =
+        shouldUseAlphaBetaPruning
+          ? game.minimaxWithAlphaBetaPruning(
+              childBoard.board,
+              Player.MAX_DEPTH,
+              Number.MIN_SAFE_INTEGER,
+              Number.MAX_SAFE_INTEGER,
+              false,
+              {maximizingPlayer: this.piece, minimizingPlayer: this.otherPlayer!.piece}
+            )
+          : game.minimax(childBoard.board, Player.MAX_DEPTH, false, {maximizingPlayer: this.piece, minimizingPlayer: this.otherPlayer!.piece});
 
       if (minimaxValue > highestValue) {
         highestValue = minimaxValue;
@@ -68,8 +78,9 @@ class Player {
       const col = await this.prompt();
       return parseInt(col) - 1;
     } else {
-      return this.getColumnForSmartAIMove(game);
       // return this.getColumnForRandomAIMove(game);
+      // return this.getColumnForSmartAIMove(game, false);
+      return this.getColumnForSmartAIMove(game, true);
     }
   }
 
@@ -120,7 +131,7 @@ class Game {
     let score = 0;
 
     if (numPieces === 4) {
-      score += 10000;
+      score += 1000000;
     } else if (numPieces === 3 && numEmpty === 1) {
       score += 5;
     } else if (numPieces === 2 && numEmpty === 2) {
@@ -128,7 +139,7 @@ class Game {
     }
 
     if (numOpponentPieces === 3 && numEmpty === 1) {
-      score -= 4;
+      score -= 500;
     }
 
     return score;
@@ -193,15 +204,62 @@ class Game {
 
     if (isMaximizingPlayer) {
       let value = Number.MIN_SAFE_INTEGER;
-      childBoards.forEach((childBoard) => {
+
+      for (let childBoard of childBoards) {
         value = Math.max(value, this.minimax(childBoard.board, depth - 1, false, playerPieceMap));
-      })
+      }
+
       return value;
     } else {
       let value = Number.MAX_SAFE_INTEGER;
-      childBoards.forEach((childBoard) => {
+
+      for (let childBoard of childBoards) {
         value = Math.min(value, this.minimax(childBoard.board, depth - 1, true, playerPieceMap));
-      })
+      }
+
+      return value;
+    }
+  }
+
+  minimaxWithAlphaBetaPruning = (board: Board, depth: number, alpha: number, beta: number, isMaximizingPlayer: boolean, playerPieceMap: PlayerPieceMap): number => {
+    let newAlpha = alpha;
+    let newBeta = beta;
+
+    const piece = isMaximizingPlayer ? playerPieceMap.maximizingPlayer : playerPieceMap.minimizingPlayer;
+    const opponentPiece = isMaximizingPlayer ? playerPieceMap.minimizingPlayer : playerPieceMap.maximizingPlayer;
+    const result = this.getResult(board)
+
+    if (depth === 0 || result !== null) {
+      return this.evaluateBoard(board, piece, opponentPiece);
+    }
+
+    const childBoards = this.getChildBoardsForBoard(board, piece);
+
+    if (isMaximizingPlayer) {
+      let value = Number.MIN_SAFE_INTEGER;
+
+      for (let childBoard of childBoards) {
+        value = Math.max(value, this.minimaxWithAlphaBetaPruning(childBoard.board, depth - 1, newAlpha, newBeta, false, playerPieceMap));
+
+        newAlpha = Math.max(alpha, value);
+        if (newAlpha >= beta) {
+          break;
+        }
+      }
+
+      return value;
+    } else {
+      let value = Number.MAX_SAFE_INTEGER;
+
+      for (let childBoard of childBoards) {
+        value = Math.min(value, this.minimaxWithAlphaBetaPruning(childBoard.board, depth - 1, newAlpha, newBeta, true, playerPieceMap));
+
+        newBeta = Math.min(beta, value);
+        if (newBeta <= alpha) {
+          break;
+        }
+      }
+
       return value;
     }
   }
@@ -252,7 +310,7 @@ class Game {
   }
 
   print = () => {
-    // console.clear();
+    console.clear();
     this.printTopOrBottomBorder();
 
     for (let row = 0; row < Game.NUM_ROWS; row++) {
