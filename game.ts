@@ -59,10 +59,10 @@ class Player {
               Player.MAX_DEPTH,
               Number.MIN_SAFE_INTEGER,
               Number.MAX_SAFE_INTEGER,
-              false,
+              true,
               {maximizingPlayer: this.piece, minimizingPlayer: this.otherPlayer!.piece}
             )
-          : game.minimax(childBoard.board, Player.MAX_DEPTH, false, {maximizingPlayer: this.piece, minimizingPlayer: this.otherPlayer!.piece});
+          : game.minimax(childBoard.board, Player.MAX_DEPTH, true, {maximizingPlayer: this.piece, minimizingPlayer: this.otherPlayer!.piece});
 
       if (minimaxValue > highestValue) {
         highestValue = minimaxValue;
@@ -127,64 +127,64 @@ class Game {
     return _.sumBy(array, (cell) => (cell === targetCell ? 1 : 0));
   }
 
-  evaluateMetrics = (numPieces: number, numOpponentPieces: number, numEmpty: number) => {
+  evaluateMetrics = (numMaximizingPieces: number, numMinimizingPieces: number, numEmpty: number) => {
     let score = 0;
 
-    if (numPieces === 4) {
+    if (numMaximizingPieces === 4) {
       score += 1000000;
-    } else if (numPieces === 3 && numEmpty === 1) {
+    } else if (numMaximizingPieces === 3 && numEmpty === 1) {
       score += 5;
-    } else if (numPieces === 2 && numEmpty === 2) {
+    } else if (numMaximizingPieces === 2 && numEmpty === 2) {
       score += 2;
     }
 
-    if (numOpponentPieces === 3 && numEmpty === 1) {
+    if (numMinimizingPieces === 3 && numEmpty === 1) {
       score -= 500;
     }
 
     return score;
   }
 
-  evaluateHorizontally = (board: Board, piece: Piece, opponentPiece: Piece, row: number, col: number) => {
-    const numPieces = this.numMatchingCellsHorizontally(board, piece, row, col);
-    const numOpponentPieces = this.numMatchingCellsHorizontally(board, opponentPiece, row, col);
+  evaluateHorizontally = (board: Board, maximizingPlayerPiece: Piece, minimizingPlayerPiece: Piece, row: number, col: number) => {
+    const numMaximizingPieces = this.numMatchingCellsHorizontally(board, maximizingPlayerPiece, row, col);
+    const numMinimizingPieces = this.numMatchingCellsHorizontally(board, minimizingPlayerPiece, row, col);
     const numEmpty = this.numMatchingCellsHorizontally(board, null, row, col);
-    return this.evaluateMetrics(numPieces, numOpponentPieces, numEmpty);
+    return this.evaluateMetrics(numMaximizingPieces, numMinimizingPieces, numEmpty);
   }
 
-  evaluateDiagonallyUp = (board: Board, piece: Piece, opponentPiece: Piece, row: number, col: number) => {
-    const numPieces = this.numMatchingCellsDiagonallyUp(board, piece, row, col);
-    const numOpponentPieces = this.numMatchingCellsDiagonallyUp(board, opponentPiece, row, col);
+  evaluateDiagonallyUp = (board: Board, maximizingPlayerPiece: Piece, minimizingPlayerPiece: Piece, row: number, col: number) => {
+    const numMaximizingPieces = this.numMatchingCellsDiagonallyUp(board, maximizingPlayerPiece, row, col);
+    const numMinimizingPieces = this.numMatchingCellsDiagonallyUp(board, minimizingPlayerPiece, row, col);
     const numEmpty = this.numMatchingCellsDiagonallyUp(board, null, row, col);
-    return this.evaluateMetrics(numPieces, numOpponentPieces, numEmpty);
+    return this.evaluateMetrics(numMaximizingPieces, numMinimizingPieces, numEmpty);
   }
 
-  evaluateDiagonallyDown = (board: Board, piece: Piece, opponentPiece: Piece, row: number, col: number) => {
-    const numPieces = this.numMatchingCellsDiagonallyDown(board, piece, row, col);
-    const numOpponentPieces = this.numMatchingCellsDiagonallyDown(board, opponentPiece, row, col);
+  evaluateDiagonallyDown = (board: Board, maximizingPlayerPiece: Piece, minimizingPlayerPiece: Piece, row: number, col: number) => {
+    const numMaximizingPieces = this.numMatchingCellsDiagonallyDown(board, maximizingPlayerPiece, row, col);
+    const numMinimizingPieces = this.numMatchingCellsDiagonallyDown(board, minimizingPlayerPiece, row, col);
     const numEmpty = this.numMatchingCellsDiagonallyDown(board, null, row, col);
-    return this.evaluateMetrics(numPieces, numOpponentPieces, numEmpty);
+    return this.evaluateMetrics(numMaximizingPieces, numMinimizingPieces, numEmpty);
   }
 
-  evaluateVertically = (board: Board, piece: Piece, opponentPiece: Piece, row: number, col: number) => {
-    const numPieces = this.numMatchingCellsVertically(board, piece, row, col);
-    const numOpponentPieces = this.numMatchingCellsVertically(board, opponentPiece, row, col);
+  evaluateVertically = (board: Board, maximizingPlayerPiece: Piece, minimizingPlayerPiece: Piece, row: number, col: number) => {
+    const numMaximizingPieces = this.numMatchingCellsVertically(board, maximizingPlayerPiece, row, col);
+    const numMinimizingPieces = this.numMatchingCellsVertically(board, minimizingPlayerPiece, row, col);
     const numEmpty = this.numMatchingCellsVertically(board, null, row, col);
-    return this.evaluateMetrics(numPieces, numOpponentPieces, numEmpty);
+    return this.evaluateMetrics(numMaximizingPieces, numMinimizingPieces, numEmpty);
   }
 
-  evaluateBoard = (board: Board, piece: Piece, opponentPiece: Piece): number => {
+  evaluateBoard = (board: Board, maximizingPlayerPiece: Piece, minimizingPlayerPiece: Piece): number => {
     let score = 0;
     const centerColumn = _.map(_.range(Game.NUM_ROWS), (row) => board[row][Math.floor(Game.NUM_COLS/2)]);
-    const numCenterPieces = this.countCellsInArray(centerColumn, piece);
+    const numCenterPieces = this.countCellsInArray(centerColumn, maximizingPlayerPiece);
     score += 3 * numCenterPieces;
 
     for (let row = 0; row < Game.NUM_ROWS; row++) {
       for (let col = 0; col < Game.NUM_COLS; col++) {
-        score += this.evaluateHorizontally(board, piece, opponentPiece, row, col);
-        score += this.evaluateDiagonallyUp(board, piece, opponentPiece, row, col);
-        score += this.evaluateDiagonallyDown(board, piece, opponentPiece, row, col);
-        score += this.evaluateVertically(board, piece, opponentPiece, row, col);
+        score += this.evaluateHorizontally(board, maximizingPlayerPiece, minimizingPlayerPiece, row, col);
+        score += this.evaluateDiagonallyUp(board, maximizingPlayerPiece, minimizingPlayerPiece, row, col);
+        score += this.evaluateDiagonallyDown(board, maximizingPlayerPiece, minimizingPlayerPiece, row, col);
+        score += this.evaluateVertically(board, maximizingPlayerPiece, minimizingPlayerPiece, row, col);
       }
     }
 
@@ -197,7 +197,7 @@ class Game {
     const result = this.getResult(board)
 
     if (depth === 0 || result !== null) {
-      return this.evaluateBoard(board, piece, opponentPiece);
+      return this.evaluateBoard(board, playerPieceMap.maximizingPlayer, playerPieceMap.minimizingPlayer);
     }
 
     const childBoards = this.getChildBoardsForBoard(board, piece);
@@ -225,15 +225,14 @@ class Game {
     let newAlpha = alpha;
     let newBeta = beta;
 
-    const piece = isMaximizingPlayer ? playerPieceMap.maximizingPlayer : playerPieceMap.minimizingPlayer;
-    const opponentPiece = isMaximizingPlayer ? playerPieceMap.minimizingPlayer : playerPieceMap.maximizingPlayer;
     const result = this.getResult(board)
 
     if (depth === 0 || result !== null) {
-      return this.evaluateBoard(board, piece, opponentPiece);
+      return this.evaluateBoard(board, playerPieceMap.maximizingPlayer, playerPieceMap.minimizingPlayer);
     }
 
-    const childBoards = this.getChildBoardsForBoard(board, piece);
+    const nextPieceToMove = isMaximizingPlayer ? playerPieceMap.minimizingPlayer : playerPieceMap.maximizingPlayer;
+    const childBoards = this.getChildBoardsForBoard(board, nextPieceToMove);
 
     if (isMaximizingPlayer) {
       let value = Number.MIN_SAFE_INTEGER;
