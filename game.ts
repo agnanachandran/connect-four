@@ -15,7 +15,7 @@ type PlayerPieceMap = Record<'maximizingPlayer' | 'minimizingPlayer', Piece>;
 
 class Player {
   otherPlayer: Player | null = null;
-  static MAX_DEPTH: number = 4;
+  static MAX_DEPTH: number = 2;
 
   constructor(readonly piece: Piece, private readonly isHuman: boolean = true) { }
 
@@ -49,10 +49,10 @@ class Player {
     const childBoards = game.getChildBoardsForBoard(game.board, this.piece);
 
     let bestCol = -1;
-    let highestValue = Number.MIN_VALUE;
+    let highestValue = Number.MIN_SAFE_INTEGER;
 
     childBoards.forEach((childBoard) => {
-      const minimaxValue = game.minimax(game.board, Player.MAX_DEPTH, true, {maximizingPlayer: this.piece, minimizingPlayer: this.otherPlayer!.piece});
+      const minimaxValue = game.minimax(childBoard.board, Player.MAX_DEPTH, true, {maximizingPlayer: this.piece, minimizingPlayer: this.otherPlayer!.piece});
 
       if (minimaxValue > highestValue) {
         highestValue = minimaxValue;
@@ -112,17 +112,83 @@ class Game {
     return this.getLowestEmptyRowForColumn(board, col) !== null;
   };
 
-  evaluateBoard = (board: Board): number => {
-    return 1;
+  countCellsInArray = (array: Array<Cell>, targetCell: Cell) => {
+    return _.sumBy(array, (cell) => (cell === targetCell ? 1 : 0));
+  }
+
+  evaluateMetrics = (numPieces: number, numOpponentPieces: number, numEmpty: number) => {
+    let score = 0;
+
+    if (numPieces === 4) {
+      score += 10000;
+    } else if (numPieces === 3 && numEmpty === 1) {
+      score += 5;
+    } else if (numPieces === 2 && numEmpty === 2) {
+      score += 2;
+    }
+
+    if (numOpponentPieces === 3 && numEmpty === 1) {
+      score -= 4;
+    }
+
+    return score;
+  }
+
+  evaluateHorizontally = (board: Board, piece: Piece, opponentPiece: Piece, row: number, col: number) => {
+    const numPieces = this.numMatchingCellsHorizontally(board, piece, row, col);
+    const numOpponentPieces = this.numMatchingCellsHorizontally(board, opponentPiece, row, col);
+    const numEmpty = this.numMatchingCellsHorizontally(board, null, row, col);
+    return this.evaluateMetrics(numPieces, numOpponentPieces, numEmpty);
+  }
+
+  evaluateDiagonallyUp = (board: Board, piece: Piece, opponentPiece: Piece, row: number, col: number) => {
+    const numPieces = this.numMatchingCellsDiagonallyUp(board, piece, row, col);
+    const numOpponentPieces = this.numMatchingCellsDiagonallyUp(board, opponentPiece, row, col);
+    const numEmpty = this.numMatchingCellsDiagonallyUp(board, null, row, col);
+    return this.evaluateMetrics(numPieces, numOpponentPieces, numEmpty);
+  }
+
+  evaluateDiagonallyDown = (board: Board, piece: Piece, opponentPiece: Piece, row: number, col: number) => {
+    const numPieces = this.numMatchingCellsDiagonallyDown(board, piece, row, col);
+    const numOpponentPieces = this.numMatchingCellsDiagonallyDown(board, opponentPiece, row, col);
+    const numEmpty = this.numMatchingCellsDiagonallyDown(board, null, row, col);
+    return this.evaluateMetrics(numPieces, numOpponentPieces, numEmpty);
+  }
+
+  evaluateVertically = (board: Board, piece: Piece, opponentPiece: Piece, row: number, col: number) => {
+    const numPieces = this.numMatchingCellsVertically(board, piece, row, col);
+    const numOpponentPieces = this.numMatchingCellsVertically(board, opponentPiece, row, col);
+    const numEmpty = this.numMatchingCellsVertically(board, null, row, col);
+    return this.evaluateMetrics(numPieces, numOpponentPieces, numEmpty);
+  }
+
+  evaluateBoard = (board: Board, piece: Piece, opponentPiece: Piece): number => {
+    let score = 0;
+    const centerColumn = _.map(_.range(Game.NUM_ROWS), (row) => board[row][Math.floor(Game.NUM_COLS/2)]);
+    const numCenterPieces = this.countCellsInArray(centerColumn, piece);
+    score += 3 * numCenterPieces;
+
+    for (let row = 0; row < Game.NUM_ROWS; row++) {
+      for (let col = 0; col < Game.NUM_COLS; col++) {
+        score += this.evaluateHorizontally(board, piece, opponentPiece, row, col);
+        score += this.evaluateDiagonallyUp(board, piece, opponentPiece, row, col);
+        score += this.evaluateDiagonallyDown(board, piece, opponentPiece, row, col);
+        score += this.evaluateVertically(board, piece, opponentPiece, row, col);
+      }
+    }
+
+    return score;
   }
 
   minimax = (board: Board, depth: number, isMaximizingPlayer: boolean, playerPieceMap: PlayerPieceMap): number => {
+    const piece = isMaximizingPlayer ? playerPieceMap.maximizingPlayer : playerPieceMap.minimizingPlayer;
+    const opponentPiece = isMaximizingPlayer ? playerPieceMap.minimizingPlayer : playerPieceMap.maximizingPlayer;
     const result = this.getResult(board)
+
     if (depth === 0 || result !== null) {
-      return this.evaluateBoard(board);
+      return this.evaluateBoard(board, piece, opponentPiece);
     }
 
-    const piece = isMaximizingPlayer ? playerPieceMap.maximizingPlayer : playerPieceMap.minimizingPlayer;
     const childBoards = this.getChildBoardsForBoard(board, piece);
 
     if (isMaximizingPlayer) {
@@ -186,7 +252,7 @@ class Game {
   }
 
   print = () => {
-    console.clear();
+    // console.clear();
     this.printTopOrBottomBorder();
 
     for (let row = 0; row < Game.NUM_ROWS; row++) {
@@ -198,75 +264,57 @@ class Game {
     console.log(`|${_.repeat(' ', Game.NUM_COLS * 3 - 1)}|`);
   }
 
-  hasWonHorizontally = (board: Board, piece: Piece, startingRow: number, startingCol: number): boolean => {
-    let numConsecutiveMatchingPieces = 0;
-
+  numMatchingCellsHorizontally = (board: Board, cell: Cell, startingRow: number, startingCol: number): number => {
+    const window = [];
     for (let col = startingCol; col < Game.NUM_COLS && col < startingCol + 4; col++) {
-      if (this.board[startingRow][col] === piece) {
-        numConsecutiveMatchingPieces += 1;
-      } else {
-        break;
-      }
+      window.push(board[startingRow][col]);
     }
 
-    return numConsecutiveMatchingPieces === 4;
+    return this.countCellsInArray(window, cell);
   }
 
-  hasWonDiagonallyUp = (board: Board, piece: Piece, startingRow: number, startingCol: number): boolean => {
-    let numConsecutiveMatchingPieces = 0;
-
+  numMatchingCellsDiagonallyUp = (board: Board, cell: Cell, startingRow: number, startingCol: number): number => {
+    const window = [];
     for (let row = startingRow, col = startingCol; row >= 0 && row > startingRow - 4 && col < Game.NUM_COLS && col < startingCol + 4; row--, col++) {
-      if (this.board[row][col] === piece) {
-        numConsecutiveMatchingPieces += 1;
-      } else {
-        break;
-      }
+      window.push(board[row][col]);
     }
 
-    return numConsecutiveMatchingPieces === 4;
+    return this.countCellsInArray(window, cell);
   }
 
-  hasWonDiagonallyDown = (board: Board, piece: Piece, startingRow: number, startingCol: number): boolean => {
-    let numConsecutiveMatchingPieces = 0;
-
+  numMatchingCellsDiagonallyDown = (board: Board, cell: Cell, startingRow: number, startingCol: number): number => {
+    const window = [];
     for (let row = startingRow, col = startingCol; row < Game.NUM_ROWS && row < startingRow + 4 && col < Game.NUM_COLS && col < startingCol + 4; row++, col++) {
-      if (this.board[row][col] === piece) {
-        numConsecutiveMatchingPieces += 1;
-      } else {
-        break;
-      }
+      window.push(board[row][col]);
     }
 
-    return numConsecutiveMatchingPieces === 4;
+    return this.countCellsInArray(window, cell);
   }
 
-  hasWonVertically = (board: Board, piece: Piece, startingRow: number, startingCol: number): boolean => {
-    let numConsecutiveMatchingPieces = 0;
-
+  numMatchingCellsVertically = (board: Board, cell: Cell, startingRow: number, startingCol: number): number => {
+    const window = [];
     for (let row = startingRow; row < Game.NUM_ROWS && row < startingRow + 4; row++) {
-      if (this.board[row][startingCol] === piece) {
-        numConsecutiveMatchingPieces += 1;
-      } else {
-        break;
-      }
+      window.push(board[row][startingCol]);
     }
 
-    return numConsecutiveMatchingPieces === 4;
+    return this.countCellsInArray(window, cell);
   }
 
   hasPlayerWonAtCell = (board: Board, player: Player, row: number, col: number): boolean => {
     const piece = player.piece;
-    return this.hasWonHorizontally(board, piece, row, col)
-      || this.hasWonDiagonallyUp(board, piece, row, col)
-      || this.hasWonDiagonallyDown(board, piece, row, col)
-      || this.hasWonVertically(board, piece, row, col);
+    return _.includes([
+      this.numMatchingCellsHorizontally(board, piece, row, col),
+      this.numMatchingCellsDiagonallyUp(board, piece, row, col),
+      this.numMatchingCellsDiagonallyDown(board, piece, row, col),
+      this.numMatchingCellsVertically(board, piece, row, col),
+    ], 4);
   }
 
   getResult = (board: Board): Result => {
     let hasSeenEmptyCell = false;
     for (let row = 0; row < Game.NUM_ROWS; row++) {
       for (let col = 0; col < Game.NUM_COLS; col++) {
-        if (this.board[row][col] === null) {
+        if (board[row][col] === null) {
           hasSeenEmptyCell = true;
         } else {
           const player1Won = this.hasPlayerWonAtCell(board, this.player1, row, col);
