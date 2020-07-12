@@ -47,31 +47,17 @@ class Player {
   }
 
   getColumnForSmartAIMove(game: Game, shouldUseAlphaBetaPruning: boolean): number {
-    const childBoards = game.getChildBoardsForBoard(game.board, this.piece);
-
-    let bestCol = -1;
-    let highestValue = Number.MIN_SAFE_INTEGER;
-
-    childBoards.forEach((childBoard) => {
-      const minimaxValue =
-        shouldUseAlphaBetaPruning
-          ? game.minimaxWithAlphaBetaPruning(
-              childBoard.board,
-              Player.MAX_DEPTH,
-              Number.MIN_SAFE_INTEGER,
-              Number.MAX_SAFE_INTEGER,
-              true,
-              {maximizingPlayer: this.piece, minimizingPlayer: this.otherPlayer!.piece}
-            )
-          : game.minimax(childBoard.board, Player.MAX_DEPTH, true, {maximizingPlayer: this.piece, minimizingPlayer: this.otherPlayer!.piece});
-
-      if (minimaxValue > highestValue) {
-        highestValue = minimaxValue;
-        bestCol = childBoard.col;
-      }
-    });
-
-    return bestCol;
+    const minimaxResult = shouldUseAlphaBetaPruning
+      ? game.minimaxWithAlphaBetaPruning(
+          game.board,
+          Player.MAX_DEPTH,
+          Number.MIN_SAFE_INTEGER,
+          Number.MAX_SAFE_INTEGER,
+          true,
+          {maximizingPlayer: this.piece, minimizingPlayer: this.otherPlayer!.piece}
+        )
+      : game.minimax(game.board, Player.MAX_DEPTH, true, {maximizingPlayer: this.piece, minimizingPlayer: this.otherPlayer!.piece});
+    return minimaxResult.col;
   }
 
   async getColumnForMove(game: Game) {
@@ -198,53 +184,70 @@ class Game {
     return score;
   }
 
-  minimax = (board: Board, depth: number, isMaximizingPlayer: boolean, playerPieceMap: PlayerPieceMap): number => {
+  minimax = (board: Board, depth: number, isMaximizingPlayer: boolean, playerPieceMap: PlayerPieceMap, col: number = -1): {col: number, value: number}  => {
     const result = this.getResult(board)
 
     if (depth === 0 || result !== null) {
-      return this.evaluateBoard(board, playerPieceMap.maximizingPlayer, playerPieceMap.minimizingPlayer);
+      const value = this.evaluateBoard(board, playerPieceMap.maximizingPlayer, playerPieceMap.minimizingPlayer);
+      return { col, value};
     }
 
-    const nextPieceToMove = isMaximizingPlayer ? playerPieceMap.minimizingPlayer : playerPieceMap.maximizingPlayer;
+    const nextPieceToMove = isMaximizingPlayer ? playerPieceMap.maximizingPlayer : playerPieceMap.minimizingPlayer;
     const childBoards = this.getChildBoardsForBoard(board, nextPieceToMove);
 
     if (isMaximizingPlayer) {
       let value = Number.MIN_SAFE_INTEGER;
+      let bestCol = -1;
 
       for (let childBoard of childBoards) {
-        value = Math.max(value, this.minimax(childBoard.board, depth - 1, false, playerPieceMap));
+        const minimaxResult = this.minimax(childBoard.board, depth - 1, false, playerPieceMap, childBoard.col);
+        if (minimaxResult.value > value) {
+          value = minimaxResult.value;
+          bestCol = childBoard.col;
+        }
       }
 
-      return value;
+      return {col: bestCol, value};
     } else {
       let value = Number.MAX_SAFE_INTEGER;
+      let bestCol = -1;
 
       for (let childBoard of childBoards) {
-        value = Math.min(value, this.minimax(childBoard.board, depth - 1, true, playerPieceMap));
+        const minimaxResult = this.minimax(childBoard.board, depth - 1, true, playerPieceMap, childBoard.col);
+        if (minimaxResult.value < value) {
+          value = minimaxResult.value;
+          bestCol = childBoard.col;
+        }
       }
 
-      return value;
+      return {col: bestCol, value};
     }
   }
 
-  minimaxWithAlphaBetaPruning = (board: Board, depth: number, alpha: number, beta: number, isMaximizingPlayer: boolean, playerPieceMap: PlayerPieceMap): number => {
+  minimaxWithAlphaBetaPruning = (board: Board, depth: number, alpha: number, beta: number, isMaximizingPlayer: boolean, playerPieceMap: PlayerPieceMap, col = -1): {col: number, value: number} => {
     let newAlpha = alpha;
     let newBeta = beta;
 
     const result = this.getResult(board)
 
     if (depth === 0 || result !== null) {
-      return this.evaluateBoard(board, playerPieceMap.maximizingPlayer, playerPieceMap.minimizingPlayer);
+      const value = this.evaluateBoard(board, playerPieceMap.maximizingPlayer, playerPieceMap.minimizingPlayer);
+      return { col, value};
     }
 
-    const nextPieceToMove = isMaximizingPlayer ? playerPieceMap.minimizingPlayer : playerPieceMap.maximizingPlayer;
+    const nextPieceToMove = isMaximizingPlayer ? playerPieceMap.maximizingPlayer : playerPieceMap.minimizingPlayer;
     const childBoards = this.getChildBoardsForBoard(board, nextPieceToMove);
 
     if (isMaximizingPlayer) {
       let value = Number.MIN_SAFE_INTEGER;
+      let bestCol = -1;
 
       for (let childBoard of childBoards) {
-        value = Math.max(value, this.minimaxWithAlphaBetaPruning(childBoard.board, depth - 1, newAlpha, newBeta, false, playerPieceMap));
+        const minimaxResult = this.minimax(childBoard.board, depth - 1, false, playerPieceMap, childBoard.col);
+        if (minimaxResult.value > value) {
+          value = minimaxResult.value;
+          bestCol = childBoard.col;
+        }
 
         newAlpha = Math.max(alpha, value);
         if (newAlpha >= beta) {
@@ -252,12 +255,17 @@ class Game {
         }
       }
 
-      return value;
+      return {col: bestCol, value};
     } else {
       let value = Number.MAX_SAFE_INTEGER;
+      let bestCol = -1;
 
       for (let childBoard of childBoards) {
-        value = Math.min(value, this.minimaxWithAlphaBetaPruning(childBoard.board, depth - 1, newAlpha, newBeta, true, playerPieceMap));
+        const minimaxResult = this.minimax(childBoard.board, depth - 1, true, playerPieceMap, childBoard.col);
+        if (minimaxResult.value < value) {
+          value = minimaxResult.value;
+          bestCol = childBoard.col;
+        }
 
         newBeta = Math.min(beta, value);
         if (newBeta <= alpha) {
@@ -265,7 +273,7 @@ class Game {
         }
       }
 
-      return value;
+      return {col: bestCol, value};
     }
   }
 
@@ -315,7 +323,7 @@ class Game {
   }
 
   print = () => {
-    console.clear();
+    // console.clear();
     this.printTopOrBottomBorder();
 
     for (let row = 0; row < Game.NUM_ROWS; row++) {
