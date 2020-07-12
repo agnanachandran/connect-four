@@ -323,7 +323,7 @@ class Game {
   }
 
   print = () => {
-    // console.clear();
+    console.clear();
     this.printTopOrBottomBorder();
 
     for (let row = 0; row < Game.NUM_ROWS; row++) {
