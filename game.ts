@@ -1,5 +1,5 @@
 import _ from 'lodash';
-import readline from "readline";
+import readline from 'readline';
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -16,7 +16,7 @@ type Strategy = 'random' | 'minimax' | 'minimax_alpha_beta';
 
 class Player {
   otherPlayer: Player | null = null;
-  static MAX_DEPTH: number = 5;
+  static MAX_DEPTH: number = 2;
 
   constructor(readonly piece: Piece, private readonly isHuman: boolean = true, private readonly strategy: Strategy = 'minimax_alpha_beta') { }
 
@@ -426,7 +426,7 @@ class Game {
 
 const main = async () => {
   const player1 = new Player(Piece.Red);
-  const player2 = new Player(Piece.Yellow, false, 'minimax_alpha_beta');
+  const player2 = new Player(Piece.Yellow, false, 'random');
   player1.setOtherPlayer(player2);
   player2.setOtherPlayer(player1);
   const game = new Game(player1, player2);
