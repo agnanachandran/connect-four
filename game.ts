@@ -243,7 +243,7 @@ class Game {
       let bestCol = -1;
 
       for (let childBoard of childBoards) {
-        const minimaxResult = this.minimax(childBoard.board, depth - 1, false, playerPieceMap, childBoard.col);
+        const minimaxResult = this.minimaxWithAlphaBetaPruning(childBoard.board, depth - 1, newAlpha, newBeta, false, playerPieceMap, childBoard.col);
         if (minimaxResult.value > value) {
           value = minimaxResult.value;
           bestCol = childBoard.col;
@@ -261,7 +261,7 @@ class Game {
       let bestCol = -1;
 
       for (let childBoard of childBoards) {
-        const minimaxResult = this.minimax(childBoard.board, depth - 1, true, playerPieceMap, childBoard.col);
+        const minimaxResult = this.minimaxWithAlphaBetaPruning(childBoard.board, depth - 1, newAlpha, newBeta, true, playerPieceMap, childBoard.col);
         if (minimaxResult.value < value) {
           value = minimaxResult.value;
           bestCol = childBoard.col;
@@ -426,7 +426,7 @@ class Game {
 
 const main = async () => {
   const player1 = new Player(Piece.Red);
-  const player2 = new Player(Piece.Yellow, false, 'random');
+  const player2 = new Player(Piece.Yellow, false, 'minimax_alpha_beta');
   player1.setOtherPlayer(player2);
   player2.setOtherPlayer(player1);
   const game = new Game(player1, player2);
